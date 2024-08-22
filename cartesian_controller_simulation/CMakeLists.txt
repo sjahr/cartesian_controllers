@@ -13,23 +13,22 @@ if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
 
-# find dependencies
-find_package(ament_cmake REQUIRED)
-find_package(cartesian_controller_base REQUIRED)
-find_package(hardware_interface REQUIRED)
-find_package(pluginlib REQUIRED)
-find_package(rclcpp REQUIRED)
-
-# Mujoco comes as a pre-built library package.
-# Extract this package somewhere and point CMake towards it during the build process.
-if(NOT DEFINED MUJOCO_DIR)
-        set(MUJOCO_DIR "$ENV{HOME}/mujoco-3.0.0") # CI setting
-        message(WARNING "MUJOCO_DIR not specified. Using default ${MUJOCO_DIR}")
-endif()
-set(MUJOCO_INCLUDE_DIRS ${MUJOCO_DIR}/include)
-set(MUJOCO_LIBRARIES
-        ${MUJOCO_DIR}/lib/libmujoco.so
+set(THIS_PACKAGE_DEPENDS
+    ament_cmake
+    cartesian_controller_base
+    hardware_interface
+    mujoco
+    pluginlib
+    rclcpp
 )
+
+# find dependencies
+# add cmake directory to the  module search path
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
+
+foreach(dependency IN ITEMS ${THIS_PACKAGE_DEPENDS})
+  find_package(${dependency} REQUIRED)
+endforeach()
 
 # --------------------------------------------------------------------------------
 # Make sure that library relocation works for both build and install.
@@ -59,15 +58,10 @@ target_include_directories(${PROJECT_NAME} PUBLIC
         $<INSTALL_INTERFACE:include>
 )
 
-ament_target_dependencies(${PROJECT_NAME}
-        cartesian_controller_base
-        hardware_interface
-        pluginlib
-        rclcpp
-)
+ament_target_dependencies(${PROJECT_NAME} ${THIS_PACKAGE_DEPENDS})
 
 target_link_libraries(${PROJECT_NAME}
-        mujoco_simulator
+        mujoco mujoco_simulator
 )
 
 pluginlib_export_plugin_description_file(hardware_interface cartesian_controller_simulation.xml)
@@ -81,13 +75,9 @@ add_library(mujoco_simulator SHARED
 target_include_directories(mujoco_simulator PUBLIC
         $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
         $<INSTALL_INTERFACE:include>
-        ${MUJOCO_INCLUDE_DIRS}
 )
 
-# X11 OpenGL: link with libmujoco210.so, libglew.so, libGL.so
-target_link_libraries(mujoco_simulator PUBLIC
-        ${MUJOCO_LIBRARIES}
-)
+target_link_libraries(mujoco_simulator mujoco)
 
 
 
